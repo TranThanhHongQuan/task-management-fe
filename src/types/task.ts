@@ -11,3 +11,12 @@ export type Task = {
   createdById: number;
   createdByEmail: string;
 };
+export type CreateTaskRequest = {
+  projectId: number;
+  title: string;
+  description?: string;
+  status?: string;
+  priority?: string;
+  deadline?: string;
+  assigneeEmail?: string;
+};

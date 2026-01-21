@@ -7,15 +7,18 @@ import { createTask, listTasks, updateTaskStatus } from "../../api/taskApi";
 import type { PageResponse } from "../../types/common";
 import type { Task } from "../../types/task";
 
+/* ================= BADGE ================= */
+
 function Badge({ text }: { text: string }) {
   const cls =
-    text.includes("DONE") || text.includes("Hoàn")
+    text.includes("DONE")
       ? "bg-emerald-100 text-emerald-700"
-      : text.includes("OVERDUE") || text.includes("Trễ")
+      : text.includes("OVERDUE")
         ? "bg-red-100 text-red-700"
-        : text.includes("IN_PROGRESS") || text.includes("Đang")
+        : text.includes("IN_PROGRESS")
           ? "bg-brand-100 text-brand-700"
           : "bg-slate-100 text-slate-700";
+
   return (
     <span className={`rounded-full px-3 py-1 text-xs font-bold ${cls}`}>
       {text}
@@ -23,23 +26,32 @@ function Badge({ text }: { text: string }) {
   );
 }
 
+/* ================= PAGE ================= */
+
 export default function ProjectTasks() {
   const { projectId } = useParams();
   const pid = Number(projectId);
 
+  /* ===== FILTERS ===== */
   const [keyword, setKeyword] = useState("");
   const [status, setStatus] = useState("");
   const [priority, setPriority] = useState("");
+
+  /* ===== DATA ===== */
   const [data, setData] = useState<PageResponse<Task> | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  /* ===== CREATE MODAL ===== */
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [newStatus, setNewStatus] = useState("TODO");
   const [newPriority, setNewPriority] = useState("MEDIUM");
   const [deadline, setDeadline] = useState("");
+  const [assigneeEmail, setAssigneeEmail] = useState("");
+
+  /* ================= LOAD ================= */
 
   async function load(page = 0) {
     setLoading(true);
@@ -66,6 +78,8 @@ export default function ProjectTasks() {
     load(0);
   }, [pid]);
 
+  /* ================= CREATE ================= */
+
   async function submitCreate() {
     setErr(null);
     try {
@@ -76,11 +90,19 @@ export default function ProjectTasks() {
         status: newStatus,
         priority: newPriority,
         deadline: deadline ? new Date(deadline).toISOString() : undefined,
+        assigneeEmail: assigneeEmail.trim() ? assigneeEmail.trim() : undefined,
       });
+
+      // reset form
       setOpen(false);
       setTitle("");
       setDesc("");
       setDeadline("");
+      setAssigneeEmail("");
+      setNewStatus("TODO");
+      setNewPriority("MEDIUM");
+      setAssigneeEmail("");
+
       await load(0);
     } catch (e: any) {
       setErr(e?.response?.data?.message ?? "Tạo task thất bại");
@@ -89,13 +111,17 @@ export default function ProjectTasks() {
 
   const rows = useMemo(() => data?.items ?? [], [data]);
 
+  /* ================= UI ================= */
+
   return (
     <div>
+      {/* ===== HEADER ===== */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="text-lg font-extrabold text-slate-900">
           Quản lý nhiệm vụ (Project #{pid})
         </div>
         <div className="flex-1" />
+
         <div className="w-72">
           <Input
             placeholder="Tìm task..."
@@ -103,6 +129,7 @@ export default function ProjectTasks() {
             onChange={(e) => setKeyword(e.target.value)}
           />
         </div>
+
         <select
           className="rounded-xl border bg-white px-3 py-2 text-sm"
           value={status}
@@ -115,6 +142,7 @@ export default function ProjectTasks() {
           <option value="REJECTED">REJECTED</option>
           <option value="OVERDUE">OVERDUE</option>
         </select>
+
         <select
           className="rounded-xl border bg-white px-3 py-2 text-sm"
           value={priority}
@@ -125,6 +153,7 @@ export default function ProjectTasks() {
           <option value="MEDIUM">MEDIUM</option>
           <option value="LOW">LOW</option>
         </select>
+
         <Button onClick={() => load(0)}>Lọc</Button>
         <Button onClick={() => setOpen(true)}>+ Thêm nhiệm vụ</Button>
       </div>
@@ -134,8 +163,12 @@ export default function ProjectTasks() {
           {err}
         </div>
       )}
-      {loading && <div className="text-sm text-slate-500">Đang tải...</div>}
 
+      {loading && (
+        <div className="text-sm text-slate-500">Đang tải...</div>
+      )}
+
+      {/* ===== TABLE ===== */}
       <Card className="overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-slate-600">
@@ -153,7 +186,9 @@ export default function ProjectTasks() {
                 <td className="px-4 py-3 font-semibold text-slate-900">
                   {t.title}
                 </td>
-                <td className="px-4 py-3">{t.assigneeEmail ?? "-"}</td>
+                <td className="px-4 py-3">
+                  {t.assigneeEmail ?? "-"}
+                </td>
                 <td className="px-4 py-3">
                   <select
                     className="rounded-xl border bg-white px-3 py-2 text-sm"
@@ -187,6 +222,7 @@ export default function ProjectTasks() {
                 </td>
               </tr>
             ))}
+
             {rows.length === 0 && (
               <tr>
                 <td
@@ -201,10 +237,14 @@ export default function ProjectTasks() {
         </table>
       </Card>
 
+      {/* ===== PAGINATION ===== */}
       {data && (
         <div className="mt-6 flex items-center justify-between text-sm text-slate-600">
           <div>
-            Tổng: <b className="text-slate-900">{data.totalElements}</b>
+            Tổng:{" "}
+            <b className="text-slate-900">
+              {data.totalElements}
+            </b>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -215,8 +255,11 @@ export default function ProjectTasks() {
               Prev
             </Button>
             <div>
-              Page <b className="text-slate-900">{data.page + 1}</b> /{" "}
-              {data.totalPages}
+              Page{" "}
+              <b className="text-slate-900">
+                {data.page + 1}
+              </b>{" "}
+              / {data.totalPages}
             </div>
             <Button
               variant="outline"
@@ -229,6 +272,7 @@ export default function ProjectTasks() {
         </div>
       )}
 
+      {/* ===== CREATE MODAL ===== */}
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
           <div className="w-full max-w-xl rounded-2xl bg-white shadow-soft">
@@ -244,30 +288,32 @@ export default function ProjectTasks() {
               </button>
             </div>
 
-            <div className="p-4 space-y-3">
+            <div className="space-y-3 p-4">
+              <Input
+                placeholder="Tiêu đề"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+
+              <textarea
+                className="w-full rounded-xl border px-3 py-2 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                rows={4}
+                placeholder="Mô tả"
+                value={desc}
+                onChange={(e) => setDesc(e.target.value)}
+              />
+
               <div>
+                <div className="mb-1 text-xs font-bold text-slate-500">
+                  Assignee Email (optional)
+                </div>
                 <Input
-                  placeholder="Tiêu đề"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  value={assigneeEmail}
+                  onChange={(e) => setAssigneeEmail(e.target.value)}
+                  placeholder="member@local.com"
                 />
               </div>
 
-              <div>
-                <textarea
-                  className="w-full rounded-xl border px-3 py-2 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
-                  rows={4}
-                  value={desc}
-                  onChange={(e) => setDesc(e.target.value)}
-                />
-              </div>
-              <div>
-                <div className="mb-1 font-semibold text-slate-700">Người thực hiện</div>
-                <Input
-                  placeholder="Email người thực hiện"
-                  disabled
-                />
-              </div>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <select
                   className="w-full rounded-xl border bg-white px-3 py-2 text-sm"
@@ -299,10 +345,16 @@ export default function ProjectTasks() {
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setOpen(false)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setOpen(false)}
+                >
                   Hủy
                 </Button>
-                <Button onClick={submitCreate} disabled={!title.trim()}>
+                <Button
+                  onClick={submitCreate}
+                  disabled={!title.trim()}
+                >
                   Lưu
                 </Button>
               </div>

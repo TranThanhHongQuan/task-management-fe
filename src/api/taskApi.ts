@@ -1,7 +1,7 @@
 import { http } from "../core/http";
 import type { PageResponse } from "../types/common";
 import type { Task } from "../types/task";
-
+import type { CreateTaskRequest } from "../types/task";
 export async function listTasks(params: {
   projectId: number;
   page?: number;
@@ -15,15 +15,7 @@ export async function listTasks(params: {
   return data;
 }
 
-export async function createTask(payload: {
-  projectId: number;
-  title: string;
-  description?: string;
-  status?: string;
-  priority?: string;
-  deadline?: string;
-  assigneeId?: number;
-}) {
+export async function createTask(payload: CreateTaskRequest) {
   const { data } = await http.post<Task>("/api/v1/tasks", payload);
   return data;
 }
