@@ -8,12 +8,16 @@ import ProjectTasks from "./pages/project/ProjectTasks";
 import ProjectMembers from "./pages/ProjectMembers";
 import MyTasks from "./pages/tasks/MyTasks";
 import Notifications from "./pages/Notifications";
+import QrPage from "./pages/QrPage";
 
 export default function App() {
   return (
     <Routes>
       {/* Redirect root */}
       <Route path="/" element={<Navigate to="/app/projects" replace />} />
+
+      {/* Public */}
+      <Route path="/qr" element={<QrPage />} />   {/* 👈 THÊM DÒNG NÀY */}
 
       {/* Auth */}
       <Route path="/login" element={<Login />} />
