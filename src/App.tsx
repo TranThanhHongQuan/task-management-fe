@@ -9,7 +9,7 @@ import ProjectMembers from "./pages/ProjectMembers";
 import MyTasks from "./pages/tasks/MyTasks";
 import Notifications from "./pages/Notifications";
 import QrPage from "./pages/QrPage";
-
+import ProfilePage from "./pages/ProfilePage";
 export default function App() {
   return (
     <Routes>
@@ -17,7 +17,7 @@ export default function App() {
       <Route path="/" element={<Navigate to="/app/projects" replace />} />
 
       {/* Public */}
-      <Route path="/qr" element={<QrPage />} />   {/* 👈 THÊM DÒNG NÀY */}
+      <Route path="/qr" element={<QrPage />} />
 
       {/* Auth */}
       <Route path="/login" element={<Login />} />
@@ -29,6 +29,7 @@ export default function App() {
         <Route path="projects/:projectId/tasks" element={<ProjectTasks />} />
         <Route path="projects/:projectId/members" element={<ProjectMembers />} />
         <Route path="my-tasks" element={<MyTasks />} />
+        <Route path="profile" element={<ProfilePage />} />
         <Route path="notifications" element={<Notifications />} />
       </Route>
 

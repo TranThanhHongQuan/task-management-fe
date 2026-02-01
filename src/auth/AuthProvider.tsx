@@ -1,9 +1,18 @@
-import React, { createContext, useMemo, useState } from "react";
+import React, { createContext, useEffect, useMemo, useState } from "react";
 import { parseJwt } from "../core/jwt";
 import { storage } from "../core/storage";
 import { loginApi, logoutApi, registerApi } from "./authApi";
+import { getMeProfile } from "./meApi";
 
-export type AuthUser = { id: number; email: string; perms: string[] };
+export type AuthUser = {
+  id: number;
+  email: string;
+  perms: string[];
+  fullName?: string;
+  phone?: string | null;
+  avatarUrl?: string | null;
+  status?: string;
+};
 
 type AuthCtx = {
   user: AuthUser | null;
@@ -11,6 +20,7 @@ type AuthCtx = {
   register: (fullName: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   has: (perm: string) => boolean;
+  refreshMe: () => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthCtx | null>(null);
@@ -32,17 +42,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return u.id ? u : null;
   });
 
+  async function refreshMe() {
+    const t = storage.get();
+    if (!t?.accessToken) return;
+
+    const profile = await getMeProfile(t.accessToken);
+
+    setUser((prev) => {
+      const base = prev ?? buildUserFromAccessToken(t.accessToken!, profile.email ?? "");
+      return { ...base, ...profile }; // ✅ giữ perms, thêm profile
+    });
+  }
+
+  // ✅ reload app: có token thì load profile
+  useEffect(() => {
+    const t = storage.get();
+    if (!t?.accessToken) return;
+    refreshMe().catch(() => {
+      storage.clear();
+      setUser(null);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function login(email: string, password: string) {
     const tokens = await loginApi({ email, password });
     storage.set(tokens);
+
     setUser(buildUserFromAccessToken(tokens.accessToken, email));
+    await refreshMe();
   }
 
   async function register(fullName: string, email: string, password: string) {
-    // fullName gửi lên BE, BE có thể lưu hoặc bỏ qua nếu bạn chưa có field
     const tokens = await registerApi({ fullName, email, password });
     storage.set(tokens);
+
     setUser(buildUserFromAccessToken(tokens.accessToken, email));
+    await refreshMe();
   }
 
   async function logout() {
@@ -58,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const has = (perm: string) => !!user?.perms.includes(perm);
 
-  const value = useMemo(() => ({ user, login, register, logout, has }), [user]);
+  const value = useMemo(() => ({ user, login, register, logout, has, refreshMe }), [user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
