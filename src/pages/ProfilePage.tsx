@@ -1,25 +1,29 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../auth/useAuth";
+import { storage } from "../core/storage";
+import { updateMeProfile } from "../auth/meApi";
+
+type ProfileForm = {
+  fullName: string;
+  phone: string;
+  avatarUrl: string;
+};
 
 export default function ProfilePage() {
-  const { user, setUser } = useAuth();
-  const token = localStorage.getItem("token");
+  const { user, refreshMe } = useAuth();
+  const token = storage.get()?.accessToken;
 
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [loading, setLoading] = useState<boolean>(false);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<ProfileForm>({
     fullName: "",
     phone: "",
     avatarUrl: "",
   });
 
-  const avatarSrc = useMemo(() => {
-    return form.avatarUrl || user?.avatarUrl || "https://i.pravatar.cc/150?img=3";
-  }, [form.avatarUrl, user]);
-
-  // Load profile (nếu user từ auth chưa có đủ field hoặc muốn refresh)
+  // Load profile về AuthContext (merge perms + profile)
   useEffect(() => {
     let ignore = false;
 
@@ -29,21 +33,8 @@ export default function ProfilePage() {
       setError("");
 
       try {
-        const res = await fetch("/api/v1/me/profile", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error("Load profile failed");
-
-        const data = await res.json();
-        if (ignore) return;
-
-        setUser(data);
-        setForm({
-          fullName: data.fullName ?? "",
-          phone: data.phone ?? "",
-          avatarUrl: data.avatarUrl ?? "",
-        });
-      } catch (e) {
+        await refreshMe();
+      } catch {
         if (!ignore) setError("Không tải được profile. Vui lòng đăng nhập lại.");
       } finally {
         if (!ignore) setLoading(false);
@@ -54,13 +45,25 @@ export default function ProfilePage() {
     return () => {
       ignore = true;
     };
-  }, [token, setUser]);
+  }, [token, refreshMe]);
 
-  const onPickAvatarFile = async (file) => {
+  // Đổ user -> form (mỗi khi refreshMe cập nhật user)
+  useEffect(() => {
+    setForm({
+      fullName: user?.fullName ?? "",
+      phone: user?.phone ?? "",
+      avatarUrl: user?.avatarUrl ?? "",
+    });
+  }, [user?.fullName, user?.phone, user?.avatarUrl]);
+
+  const avatarSrc = useMemo(() => {
+    return form.avatarUrl || user?.avatarUrl || "https://i.pravatar.cc/150?img=3";
+  }, [form.avatarUrl, user?.avatarUrl]);
+
+  const onPickAvatarFile = async (file?: File) => {
     if (!file) return;
 
-    // demo preview bằng base64 (production: upload cloud -> url)
-    const base64 = await new Promise((resolve, reject) => {
+    const base64 = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result));
       reader.onerror = reject;
@@ -77,32 +80,15 @@ export default function ProfilePage() {
     setError("");
 
     try {
-      const res = await fetch("/api/v1/me/profile", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          fullName: form.fullName,
-          phone: form.phone || null,
-          avatarUrl: form.avatarUrl || null,
-        }),
+      await updateMeProfile(token, {
+        fullName: form.fullName.trim(),
+        phone: form.phone.trim() || null,
+        avatarUrl: form.avatarUrl.trim() || null,
       });
 
-      if (!res.ok) {
-        const msg = await res.text().catch(() => "");
-        throw new Error(msg || "Update failed");
-      }
-
-      const updated = await res.json();
-      setUser(updated);
-      setForm({
-        fullName: updated.fullName ?? "",
-        phone: updated.phone ?? "",
-        avatarUrl: updated.avatarUrl ?? "",
-      });
-    } catch (e) {
+      // refresh lại context để header/avatar update ngay
+      await refreshMe();
+    } catch {
       setError("Cập nhật thất bại. Kiểm tra dữ liệu hoặc đăng nhập lại.");
     } finally {
       setSaving(false);
@@ -115,9 +101,7 @@ export default function ProfilePage() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-xl font-extrabold text-slate-900">Hồ sơ cá nhân</div>
-            <div className="mt-1 text-sm text-slate-600">
-              Cập nhật thông tin hiển thị của bạn.
-            </div>
+            <div className="mt-1 text-sm text-slate-600">Cập nhật thông tin hiển thị của bạn.</div>
           </div>
 
           <div className="text-right text-sm text-slate-600">
@@ -144,7 +128,7 @@ export default function ProfilePage() {
               />
             </label>
             <div className="w-full text-xs text-slate-500">
-              *Demo đang preview base64. Thực tế nên upload Cloud/S3 để lấy URL.
+              *Nếu bạn chưa có upload backend, hãy dùng Avatar URL hoặc upload Cloud/S3 lấy link.
             </div>
           </div>
 
@@ -171,25 +155,29 @@ export default function ProfilePage() {
             />
 
             <Field
-              label="Avatar URL (tuỳ chọn)"
+              label="Avatar URL"
               value={form.avatarUrl}
               onChange={(v) => setForm((p) => ({ ...p, avatarUrl: v }))}
               placeholder="https://..."
             />
 
             <div className="flex items-center justify-between pt-2">
-              <div className="text-sm text-slate-500">
-                {loading ? "Đang tải..." : " "}
-              </div>
+              <div className="text-sm text-slate-500">{loading ? "Đang tải..." : " "}</div>
 
               <button
-                disabled={saving}
+                disabled={saving || loading}
                 onClick={save}
                 className="rounded-xl bg-black px-4 py-2 text-sm font-extrabold text-white hover:opacity-90 disabled:opacity-60"
               >
                 {saving ? "Đang lưu..." : "Lưu thay đổi"}
               </button>
             </div>
+
+            {!token && (
+              <div className="text-sm font-semibold text-red-600">
+                Không tìm thấy accessToken. Bạn cần đăng nhập lại.
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -197,7 +185,17 @@ export default function ProfilePage() {
   );
 }
 
-function Field({ label, value, onChange, placeholder }) {
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
   return (
     <div>
       <div className="text-sm font-semibold text-slate-700">{label}</div>
