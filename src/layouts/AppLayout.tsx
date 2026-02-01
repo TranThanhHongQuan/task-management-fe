@@ -9,26 +9,31 @@ export default function AppLayout() {
   const nav = useNavigate();
   const { count } = useUnreadNotifications();
 
-  // ✅ hooks luôn nằm ở đây (trước return điều kiện)
-  const [openMenu, setOpenMenu] = useState(false);
-  const menuRef = useRef(null);
+  const [openMenu, setOpenMenu] = useState<boolean>(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const onClickOutside = (e) => {
-      if (!menuRef.current) return;
-      if (!menuRef.current.contains(e.target)) setOpenMenu(false);
+    const onClickOutside = (e: MouseEvent) => {
+      const el = menuRef.current;
+      if (!el) return;
+
+      const target = e.target as Node | null;
+      if (target && !el.contains(target)) setOpenMenu(false);
     };
-    const onKeyDown = (e) => e.key === "Escape" && setOpenMenu(false);
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenMenu(false);
+    };
 
     document.addEventListener("mousedown", onClickOutside);
     document.addEventListener("keydown", onKeyDown);
+
     return () => {
       document.removeEventListener("mousedown", onClickOutside);
       document.removeEventListener("keydown", onKeyDown);
     };
   }, []);
 
-  // ✅ return điều kiện đặt sau hooks
   if (!user) return <Navigate to="/login" replace />;
 
   return (
@@ -56,7 +61,7 @@ export default function AppLayout() {
 
             {/* Avatar menu */}
             <div className="relative" ref={menuRef}>
-              <button onClick={() => setOpenMenu((v) => !v)} className="group">
+              <button onClick={() => setOpenMenu((v) => !v)} className="group" title="Tài khoản">
                 <img
                   src={user.avatarUrl || "https://i.pravatar.cc/150?img=3"}
                   alt="avatar"
@@ -72,7 +77,9 @@ export default function AppLayout() {
                     </div>
                     <div className="text-xs text-slate-500 break-all">{user.email}</div>
                   </div>
+
                   <div className="h-px bg-slate-100" />
+
                   <button
                     onClick={() => {
                       setOpenMenu(false);
@@ -82,6 +89,7 @@ export default function AppLayout() {
                   >
                     👤 Profile
                   </button>
+
                   <button
                     onClick={async () => {
                       setOpenMenu(false);
